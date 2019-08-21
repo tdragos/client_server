@@ -10,7 +10,7 @@
 #include <arpa/inet.h>
 
 #define ADDR "127.0.0.1"
-#define PORT 4445
+#define PORT 4443
 #define BUFSIZE 1000
 
 int main(int argc, char **argv)
@@ -61,8 +61,8 @@ int main(int argc, char **argv)
     //we set a timeout of 1 second
     int openfd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
     struct timeval tm;
-    tm.tv_sec = 1;
-    tm.tv_usec = 0;
+    tm.tv_sec = 0;
+    tm.tv_usec = 500;
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(sockfd, &fds);
@@ -86,6 +86,7 @@ int main(int argc, char **argv)
     
     //close the file
     close(openfd);
+    close(sockfd);
     
     printf("Received the file\n");
     

@@ -49,50 +49,111 @@ int main(int argc, char **argv)
         exit(1);
     }
     
-
+    fd_set fds;
+    int client_sockets[MAX_CLIENTS], current_client, max_fd;
+    
+    for (int i = 0; i < MAX_CLIENTS; i++)
+        client_sockets[i] = 0;
+    
     //server waits for clients forever
     while (1) {
-        //accept a connection
-        connection_socket = accept(sockfd, NULL, NULL);
-        if (connection_socket < 0) {
-            perror("accept");
-            exit(1);
-        }
-
-        //read the filename. We assume it's length is max 20
-        int chars_read, chars_written;
-        char filename[20];
         
-        chars_read = read(connection_socket, filename, 20);
-        if (chars_read <= 0) {
-            perror("error receiving filename, we tell the client we don't have the file");
-            write(connection_socket, "File not found", 14);
+        status = 0;
+        FD_ZERO(&fds);
+        FD_SET(sockfd, &fds);
+        max_fd = sockfd;
+        
+        //verify our valid clients and get the max fd
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            current_client = client_sockets[i];
+            
+            if (current_client > 0)
+                FD_SET(current_client, &fds);
+            
+            if (current_client > max_fd)
+                max_fd = current_client;
+        }
+        
+        printf("BEFORE SELECT: %d %d %d\n", max_fd, sockfd, status);
+        
+        status = select(max_fd + 1, &fds, NULL, NULL, NULL);
+        if (status < 0) {
+            perror("select");
+            //continue;
+        }
+        
+        printf("AFTER SELECT: %d %d %d\n", max_fd, sockfd, status);
+        
+        //check if we get a new connection
+        if (FD_ISSET(sockfd, &fds)) {
+            
+            //accept the connection
+            connection_socket = accept(sockfd, NULL, NULL);
+            if (connection_socket < 0) {
+                perror("accept");
+                exit(1);
+            }
+            
+            //add the new client in our array
+            for (int i = 0; i < MAX_CLIENTS; i++) {
+                if (client_sockets[i] == 0) {
+                    client_sockets[i] = connection_socket;
+                    break;
+                }
+            }
             continue;
         }
-        filename[chars_read] = '\0';
         
-        //tell the client we have the file
-        chars_written = send(connection_socket, "File was found", 14, 0);
-        
-        //open the file
-        int open_fd = open(filename, O_RDONLY);
-        if (open_fd < 0) {
-            //if open fails it means we don't have the file
-            perror("we don't have the file");
-            write (connection_socket, "File not found", 14);
-            continue;
-        }
-        
-        //send the file
-        char buf[BUFSIZE];
-        while ((chars_read = read(open_fd, buf, BUFSIZE)) > 0) {
-            chars_written = send(connection_socket, buf, chars_read, 0);
+        //see what client we have to send the file to
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            current_client = client_sockets[i];
+            
+            if (FD_ISSET(current_client, &fds)) {
+                
+                printf("CURRENT CLIENT IS: %d\n", current_client);
+                //read the filename. We assume it's length is max 20
+                int chars_read, chars_written;
+                char filename[20];
+                
+                chars_read = read(current_client, filename, 20);
+                if (chars_read <= 0) {
+                    perror("error receiving filename, we tell the client we don't have the file");
+                    write(current_client, "File not found", 14);
+                    continue;
+                }
+                filename[chars_read] = '\0';
+                
+                //tell the client we have the file
+                chars_written = send(current_client, "File was found", 14, 0);
+                
+                //open the file
+                int open_fd = open(filename, O_RDONLY);
+                if (open_fd < 0) {
+                    //if open fails it means we don't have the file
+                    perror("we don't have the file");
+                    write (current_client, "File not found", 14);
+                    continue;
+                }
+                printf("^OPENED FILE: %s\n", filename);
+                
+                //send the file
+                char buf[BUFSIZE];
+                while ((chars_read = read(open_fd, buf, BUFSIZE)) > 0) {
+                    chars_written = send(current_client, buf, chars_read, 0);
+                }
+
+                //close the file
+                close(current_client);
+                close(open_fd);
+                
+                //not a client any more
+                //close(current_client);
+                client_sockets[i] = 0;
+                
+                printf("Send was successful\n");
+            }
         }
 
-        //close the file
-        close(open_fd);
-        
-        printf("Send was successful\n");
     }
     
     return 0;
