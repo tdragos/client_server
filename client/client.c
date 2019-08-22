@@ -3,7 +3,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -57,38 +59,34 @@ int main(int argc, char **argv)
     }
     
     //receive the file
-    //we use select to see when we get data from the server
-    //we set a timeout of 1 second
+    //we set a timeout of 1000 ns for recv
     int openfd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
     struct timeval tm;
     tm.tv_sec = 0;
-    tm.tv_usec = 500;
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(sockfd, &fds);
+    tm.tv_usec = 1000;
     
-    while (1) {
-        status = select(sockfd + 1, &fds, NULL, NULL, &tm);
-        if (status == -1) {
-            perror("select");
-            close(openfd);
-            return 0;
-        }
-        else if (status) {
-            chars_read = recv(sockfd, buf, BUFSIZE, 0);
-            if (chars_read > 0)
-                write(openfd, buf, chars_read);
-        }
-        else if (status == 0)
-            //timeout => file was received so we exit the loop
-            break;
+    //add the timeout for recv for our socket
+    status = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tm, sizeof tm);
+    if (status < 0) {
+        perror ("setsock");
+        exit(1);
     }
+    
+    //get the file
+    while ((chars_read = recv(sockfd, buf, BUFSIZE, 0)) > 0) {
+        chars_written = write(openfd, buf, chars_read);
+        if (chars_written < 0) {
+            perror ("write failed, please get the file again");
+            exit(1);
+        }
+    }
+    
+    
+    printf("Received the file\n");
     
     //close the file
     close(openfd);
     close(sockfd);
-    
-    printf("Received the file\n");
     
     return 0;
 }

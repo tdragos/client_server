@@ -22,8 +22,10 @@ int main(int argc, char **argv)
     }
     
     int sockfd, status, connection_socket;
+    int client_sockets[MAX_CLIENTS], current_client = 0, max_fd;
     char *ptr;
     struct sockaddr_in sa;
+    fd_set fds;
 
     //create the socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -34,6 +36,7 @@ int main(int argc, char **argv)
 
     sa.sin_family = AF_INET;
     inet_aton(ADDR, &sa.sin_addr);
+    
     //get the port from argv[1] with strtol (atoi is deprecated)
     sa.sin_port = htons((unsigned short)strtol(argv[1], &ptr, BASE));
 
@@ -49,20 +52,16 @@ int main(int argc, char **argv)
         exit(1);
     }
     
-    fd_set fds;
-    int client_sockets[MAX_CLIENTS], current_client, max_fd;
-    
     for (int i = 0; i < MAX_CLIENTS; i++)
         client_sockets[i] = 0;
     
     //server waits for clients forever
     while (1) {
         
-        status = 0;
         FD_ZERO(&fds);
         FD_SET(sockfd, &fds);
         max_fd = sockfd;
-        
+
         //verify our valid clients and get the max fd
         for (int i = 0; i < MAX_CLIENTS; i++) {
             current_client = client_sockets[i];
@@ -73,17 +72,12 @@ int main(int argc, char **argv)
             if (current_client > max_fd)
                 max_fd = current_client;
         }
-        
-        printf("BEFORE SELECT: %d %d %d\n", max_fd, sockfd, status);
-        
+                
         status = select(max_fd + 1, &fds, NULL, NULL, NULL);
         if (status < 0) {
             perror("select");
-            //continue;
         }
-        
-        printf("AFTER SELECT: %d %d %d\n", max_fd, sockfd, status);
-        
+                
         //check if we get a new connection
         if (FD_ISSET(sockfd, &fds)) {
             
@@ -93,6 +87,7 @@ int main(int argc, char **argv)
                 perror("accept");
                 exit(1);
             }
+            printf("I accept new connection, fd: %d\n", connection_socket);
             
             //add the new client in our array
             for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -103,7 +98,7 @@ int main(int argc, char **argv)
             }
             continue;
         }
-        
+
         //see what client we have to send the file to
         for (int i = 0; i < MAX_CLIENTS; i++) {
             current_client = client_sockets[i];
@@ -123,9 +118,6 @@ int main(int argc, char **argv)
                 }
                 filename[chars_read] = '\0';
                 
-                //tell the client we have the file
-                chars_written = send(current_client, "File was found", 14, 0);
-                
                 //open the file
                 int open_fd = open(filename, O_RDONLY);
                 if (open_fd < 0) {
@@ -134,23 +126,31 @@ int main(int argc, char **argv)
                     write (current_client, "File not found", 14);
                     continue;
                 }
-                printf("^OPENED FILE: %s\n", filename);
+                
+                //tell the client we have the file
+                chars_written = send(current_client, "File was found", 14, 0);
+                if (chars_written < 0) {
+                    perror("send file was found");
+                }
                 
                 //send the file
                 char buf[BUFSIZE];
                 while ((chars_read = read(open_fd, buf, BUFSIZE)) > 0) {
                     chars_written = send(current_client, buf, chars_read, 0);
+                    if (chars_written < 0) {
+                        perror("send failed, go to next client");
+                        continue;
+                    }
                 }
+                
+                printf("Send was successful\n");
 
                 //close the file
-                close(current_client);
                 close(open_fd);
                 
                 //not a client any more
-                //close(current_client);
                 client_sockets[i] = 0;
-                
-                printf("Send was successful\n");
+                close(current_client);
             }
         }
 
