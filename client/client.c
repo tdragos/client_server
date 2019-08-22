@@ -3,13 +3,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/select.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 
 #define ADDR "127.0.0.1"
 #define PORT 4443
@@ -24,6 +19,7 @@ int main(int argc, char **argv)
     
     int sockfd, status;
     struct sockaddr_in sa;
+    struct timeval tm;
     
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -61,7 +57,7 @@ int main(int argc, char **argv)
     //receive the file
     //we set a timeout of 1000 ns for recv
     int openfd = open(argv[1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    struct timeval tm;
+    
     tm.tv_sec = 0;
     tm.tv_usec = 1000;
     
@@ -80,7 +76,6 @@ int main(int argc, char **argv)
             exit(1);
         }
     }
-    
     
     printf("Received the file\n");
     
