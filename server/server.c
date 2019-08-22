@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/select.h>
 
-#define ADDR "127.0.0.1"
+#define ADDR "::1"
 #define MAX_CLIENTS 5
 #define BASE 10
 #define BUFSIZE 1000
@@ -17,26 +17,32 @@ int main(int argc, char **argv)
         exit(1);
     }
     
-    int sockfd, status, connection_socket;
+    int sockfd, status, connection_socket, on = 1;
     int client_sockets[MAX_CLIENTS], current_client = 0, max_fd;
     char *ptr;
-    struct sockaddr_in sa;
+    struct sockaddr_in6 sa;
     fd_set fds;
 
     //create the socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (sockfd == -1) {
         perror("create socket");
         exit(1);
     }
+    
+    status = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
+    if (status < 0) {
+        perror("setsockopt");
+        exit(1);
+    }
 
-    sa.sin_family = AF_INET;
-    inet_aton(ADDR, &sa.sin_addr);
+    sa.sin6_family = AF_INET6;
+    sa.sin6_addr = in6addr_any;
     
     //get the port from argv[1] with strtol (atoi is deprecated)
-    sa.sin_port = htons((unsigned short)strtol(argv[1], &ptr, BASE));
+    sa.sin6_port = htons((unsigned short)strtol(argv[1], &ptr, BASE));
 
-    status = bind(sockfd, (struct sockaddr *)&sa, sizeof(struct sockaddr_in));
+    status = bind(sockfd, (struct sockaddr *)&sa, sizeof(sa));
     if (status < 0) {
         perror("bind");
         exit(1);
