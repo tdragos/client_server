@@ -89,8 +89,7 @@ int main(int argc, char **argv)
                 perror("accept");
                 exit(1);
             }
-            printf("I accept new connection, fd: %d\n", connection_socket);
-            
+
             //add the new client in our array
             for (int i = 0; i < MAX_CLIENTS; i++) {
                 if (client_sockets[i] == 0) {
@@ -107,7 +106,6 @@ int main(int argc, char **argv)
             
             if (FD_ISSET(current_client, &fds)) {
                 
-                printf("CURRENT CLIENT IS: %d\n", current_client);
                 //read the filename. We assume it's length is max 20
                 int chars_read, chars_written;
                 char filename[20];
