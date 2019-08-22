@@ -17,22 +17,39 @@ int main(int argc, char **argv)
         exit(1);
     }
     
-    int sockfd, status;
-    struct sockaddr_in sa;
+    int sockfd, status, domain;
     struct timeval tm;
+    struct sockaddr_storage sa;
+    char check_protocol[16];
     
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    //check if we have an ipv4 or an ipv6 address
+    if (inet_pton(AF_INET, ADDR, check_protocol)) {
+        domain = AF_INET;
+        ((struct sockaddr_in *)&sa)->sin_port = htons(PORT);
+        ((struct sockaddr_in *)&sa)->sin_family = AF_INET;
+        inet_pton(AF_INET, ADDR, &((struct sockaddr_in *)&sa)->sin_addr);
+        
+    }
+    else if (inet_pton(AF_INET6, ADDR, check_protocol)) {
+        domain = AF_INET6;
+        ((struct sockaddr_in6 *)&sa)->sin6_port = htons(PORT);
+        ((struct sockaddr_in6 *)&sa)->sin6_family = AF_INET6;
+        inet_pton(AF_INET6, ADDR, &((struct sockaddr_in6 *)&sa)->sin6_addr);
+    }
+    else {
+        perror("Invalid Addres");
+        exit(1);
+    }
+    
+    //create the socket
+    sockfd = socket(domain, SOCK_STREAM, 0);
     if (sockfd == -1) {
         perror("create socket");
         exit(1);
     }
     
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(PORT);
-    inet_aton(ADDR, &sa.sin_addr);
-    
     //connect to the server
-    status = connect(sockfd, (const struct sockaddr *)&sa, sizeof(struct sockaddr_in));
+    status = connect(sockfd, (const struct sockaddr *)&sa, sizeof(sa));
     if (status < 0) {
         perror("connect");
         exit(1);
