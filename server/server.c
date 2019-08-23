@@ -30,6 +30,7 @@ int main(int argc, char **argv)
         exit(1);
     }
     
+    //we can accept both, ipv4 and ipv6 addresses
     status = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
     if (status < 0) {
         perror("setsockopt");

@@ -6,7 +6,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
-#define ADDR "127.0.0.1"
+#define ADDR "::1"
 #define PORT 4443
 #define BUFSIZE 1000
 
@@ -68,6 +68,7 @@ int main(int argc, char **argv)
     chars_read = recv(sockfd, buf, 14, 0);
     if (!strncmp(buf, "File not found", 14)) {
         printf("File not found");
+        close(sockfd);
         return 0;
     }
     
